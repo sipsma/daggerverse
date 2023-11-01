@@ -1,0 +1,8 @@
+{
+  "name": "example",
+  "sdk": "go",
+  "dependencies": [
+    "github.com/shykes/daggerverse/ttlsh@16e40ec244966e55e36a13cb6e1ff8023e1e1473",
+    "github.com/sipsma/quartz-technology-daggerverse/node@96cf1889f1a57058a00ab7d3b0fe3e6bfa3c16cb"
+  ]
+}
