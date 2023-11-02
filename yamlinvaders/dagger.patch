@@ -1,0 +1,112 @@
+diff --git a/invaders.c b/invaders.c
+index c80a6d3..78d9ef0 100644
+--- a/invaders.c
++++ b/invaders.c
+@@ -38,15 +38,15 @@ static const Sprite sprites[][2][2] = {
+     [ASCII] = {
+       {
+         {
+-          " {@@} ",
+-          " /\"\"\\ ",
++          " YAML ",
++          " - no ",
+           "      "
+         }
+       },
+       {
+         {
+-          " {@@} ",
+-          "  \\/  ",
++          " YAML ",
++          " false",
+           "      "
+         }
+       }
+@@ -72,15 +72,15 @@ static const Sprite sprites[][2][2] = {
+     [ASCII] = {
+       {
+         {
+-          " dOOb ",
+-          " ^/\\^ ",
++          " YAML ",
++          " - 08 ",
+           "      "
+         }
+       },
+       {
+         {
+-          " dOOb ",
+-          " ~||~ ",
++          " YAML ",
++          "- \"08\"",
+           "      "
+         }
+       }
+@@ -106,15 +106,15 @@ static const Sprite sprites[][2][2] = {
+     [ASCII] = {
+       {
+         {
+-          " /MM\\ ",
+-          " |~~| ",
++          " YAML ",
++          " 04:30",
+           "      "
+         }
+       },
+       {
+         {
+-          " /MM\\ ",
+-          " \\~~/ ",
++          " YAML ",
++          " 16200",
+           "       "
+         }
+       }
+@@ -140,8 +140,8 @@ static const Sprite sprites[][2][2] = {
+     [ASCII] = {
+       {
+         {
+-          "_/MMM\\_",
+-          "qWAVAWp"
++          "_YAML!_",
++          "_YAML!_"
+         }
+       }
+     },
+@@ -158,8 +158,8 @@ static const Sprite sprites[][2][2] = {
+     [ASCII] = {
+       {
+         {
+-          "  mAm  ",
+-          " MAZAM "
++          " DAGGER ",
++          "  SDKS  "
+         }
+       }
+     },
+@@ -228,9 +228,9 @@ static const Sprite sprites[][2][2] = {
+     [ASCII] = {
+       {
+         {
+-          "/MMMMM\\",
+-          "MMMMMMM",
+-          "MMM MMM"
++          "MODULES",
++          "MODULES",
++          "MODULES"
+         }
+       }
+     },
+@@ -238,9 +238,9 @@ static const Sprite sprites[][2][2] = {
+       /* TODO */
+       {
+         {
+-          "/MMMMM\\",
+-          "MMMMMMM",
+-          "MMM MMM"
++          "MODULES",
++          "MODULES",
++          "MODULES"
+         }
+       }
+     }
