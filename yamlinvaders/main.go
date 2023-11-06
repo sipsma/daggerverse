@@ -7,7 +7,6 @@ import (
 type Yamlinvaders struct{}
 
 // A silly TUI game that let's you destroy YAML. Press space to start on menu, arrow keys to move and space to shoot.
-// Example usage: "dagger -m github.com/sipsma/daggerverse/yamlinvaders shell play"
 func (m *Yamlinvaders) Play(ctx context.Context) (*Container, error) {
 	repo := dag.
 		Git("https://github.com/macdice/ascii-invaders.git").
