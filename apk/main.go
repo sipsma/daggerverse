@@ -86,7 +86,7 @@ func (m *Apk) Container(ctx context.Context, pkgs []string) (*Container, error) 
 			if !strings.HasPrefix(entry, ".") {
 				continue
 			}
-			rmFiles = append(rmFiles, filepath.Join(outDir, entry))
+			rmFiles = append(rmFiles, entry)
 			switch entry {
 			case ".pre-install":
 				preInstallFile = unpacked.File(filepath.Join(outDir, entry))
@@ -97,8 +97,7 @@ func (m *Apk) Container(ctx context.Context, pkgs []string) (*Container, error) 
 			}
 		}
 
-		// TODO: squash layers or otherwise fix
-		pkgDir := unpacked.WithExec(append([]string{"rm"}, rmFiles...)).Directory(outDir)
+		pkgDir := unpacked.Directory(outDir)
 
 		if preInstallFile != nil {
 			ctr = ctr.
@@ -106,14 +105,16 @@ func (m *Apk) Container(ctx context.Context, pkgs []string) (*Container, error) 
 				WithExec([]string{"/tmp/script"}).
 				WithoutMount("/tmp/script")
 		}
-		ctr = ctr.WithDirectory("/", pkgDir)
+		ctr = ctr.WithDirectory("/", pkgDir, ContainerWithDirectoryOpts{
+			Exclude: rmFiles,
+		})
 		if postInstallFile != nil {
 			ctr = ctr.
 				WithMountedFile("/tmp/script", postInstallFile).
 				WithExec([]string{"/tmp/script"}).
 				WithoutMount("/tmp/script")
 		}
-		// TODO: not sure if this is actually when trigger should run?
+		// TODO: not sure if this is actually when trigger should run? and/or if it should run other times too?
 		if triggerFile != nil {
 			ctr = ctr.
 				WithMountedFile("/tmp/script", triggerFile).
@@ -122,7 +123,7 @@ func (m *Apk) Container(ctx context.Context, pkgs []string) (*Container, error) 
 		}
 
 		// TODO:
-		// ctr = ctr.WithDirectory(filepath.Join("/mnt", pkg.Name), unpacked.Directory(outDir))
+		// ctr = ctr.WithDirectory(filepath.Join("/mnt", pkg.Name), pkgDir)
 	}
 
 	return ctr, nil
