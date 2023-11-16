@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/chainguard-dev/go-apk/pkg/apk"
+	goapk "github.com/chainguard-dev/go-apk/pkg/apk"
 )
 
 const (
@@ -22,12 +22,35 @@ const (
 
 type Apk struct{}
 
-func (m *Apk) Container(ctx context.Context, pkgs []string) (*Container, error) {
-	repo := apk.NewRepositoryFromComponents(
+func (m *Apk) LegacyBuild(ctx context.Context, pkgs []string) *Container {
+	return dag.Container().From("alpine:" + alpineVersion[1:]).
+		WithExec(append([]string{"apk", "add"}, pkgs...))
+}
+
+func (m *Apk) Scan(ctx context.Context, pkgs []string, legacy Optional[bool]) (string, error) {
+	var ctr *Container
+	if legacy.GetOr(false) {
+		ctr = m.LegacyBuild(ctx, pkgs)
+	} else {
+		var err error
+		ctr, err = m.Build(ctx, pkgs, Opt(false))
+		if err != nil {
+			return "", err
+		}
+	}
+	return dag.Trivy().ScanContainer(ctx, ctr)
+}
+
+func (m *Apk) Build(
+	ctx context.Context,
+	pkgs []string,
+	debugPkgs Optional[bool],
+) (*Container, error) {
+	repo := goapk.NewRepositoryFromComponents(
 		alpineRepository,
 		alpineVersion,
 		"main",
-		"", //TODO: apkarch(), but including here breaks it below in GetRepositoryIndexes?
+		"",
 	)
 
 	keys, err := m.keys()
@@ -35,15 +58,14 @@ func (m *Apk) Container(ctx context.Context, pkgs []string) (*Container, error) 
 		return nil, fmt.Errorf("failed to get alpine keys: %w", err)
 	}
 
-	indexes, err := apk.GetRepositoryIndexes(ctx, []string{repo.URI}, keys, apkarch())
+	indexes, err := goapk.GetRepositoryIndexes(ctx, []string{repo.URI}, keys, apkarch())
 	if err != nil {
 		return nil, fmt.Errorf("failed to get alpine indexes: %w", err)
 	}
 
-	pkgResolver := apk.NewPkgResolver(ctx, indexes)
+	pkgResolver := goapk.NewPkgResolver(ctx, indexes)
 
-	// TODO: these base packages should be skippable if desired
-	pkgs = append([]string{"alpine-baselayout", "busybox"}, pkgs...)
+	pkgs = append([]string{"alpine-baselayout", "alpine-release", "busybox"}, pkgs...)
 
 	repoPkgs, conflicts, err := pkgResolver.GetPackagesWithDependencies(ctx, pkgs)
 	if err != nil {
@@ -53,7 +75,7 @@ func (m *Apk) Container(ctx context.Context, pkgs []string) (*Container, error) 
 		return nil, fmt.Errorf("failed to get alpine packages: %v", conflicts)
 	}
 
-	setupBase := dag.Container().From("alpine:" + alpineVersion[1:])
+	setupBase := dag.Container().From("busybox:latest")
 
 	ctr := dag.Container()
 
@@ -67,14 +89,6 @@ func (m *Apk) Container(ctx context.Context, pkgs []string) (*Container, error) 
 			WithMountedDirectory(outDir, dag.Directory()).
 			WithWorkdir(outDir).
 			WithExec([]string{"tar", "-xf", mntPath})
-
-		// TODO: check if there's any other important script files
-		// TODO: make scripts optional too?
-
-		// TODO: setup caching such that it works nicely w/ remote cache; wrapping in a function
-		// may do it once we have better cache control. Right now we need to always pull the
-		// packages to read the entries.
-		// TODO: the above could also make the parallelization easier
 
 		entries, err := unpacked.Directory(outDir).Entries(ctx)
 		if err != nil {
@@ -114,7 +128,6 @@ func (m *Apk) Container(ctx context.Context, pkgs []string) (*Container, error) 
 				WithExec([]string{"/tmp/script"}).
 				WithoutMount("/tmp/script")
 		}
-		// TODO: not sure if this is actually when trigger should run? and/or if it should run other times too?
 		if triggerFile != nil {
 			ctr = ctr.
 				WithMountedFile("/tmp/script", triggerFile).
@@ -122,15 +135,16 @@ func (m *Apk) Container(ctx context.Context, pkgs []string) (*Container, error) 
 				WithoutMount("/tmp/script")
 		}
 
-		// TODO:
-		// ctr = ctr.WithDirectory(filepath.Join("/mnt", pkg.Name), pkgDir)
+		if debugPkgs.GetOr(false) {
+			ctr = ctr.WithDirectory(filepath.Join("/debug", pkg.Name), pkgDir)
+		}
 	}
 
 	return ctr, nil
 }
 
 func (m *Apk) Debug(ctx context.Context, pkgs []string) (*Container, error) {
-	ctr, err := m.Container(ctx, pkgs)
+	ctr, err := m.Build(ctx, pkgs, Opt(false))
 	if err != nil {
 		return nil, err
 	}
@@ -169,7 +183,7 @@ func (m *Apk) keys() (map[string][]byte, error) {
 	return keys, nil
 }
 
-func (m *Apk) releases() (*apk.Releases, error) {
+func (m *Apk) releases() (*goapk.Releases, error) {
 	res, err := http.Get(alpineReleasesURL)
 	defer res.Body.Close()
 	if res.StatusCode != http.StatusOK {
@@ -179,7 +193,7 @@ func (m *Apk) releases() (*apk.Releases, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to read alpine releases: %w", err)
 	}
-	var releases apk.Releases
+	var releases goapk.Releases
 	if err := json.Unmarshal(b, &releases); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal alpine releases: %w", err)
 	}
@@ -188,5 +202,5 @@ func (m *Apk) releases() (*apk.Releases, error) {
 }
 
 func apkarch() string {
-	return apk.ArchToAPK(runtime.GOARCH)
+	return goapk.ArchToAPK(runtime.GOARCH)
 }

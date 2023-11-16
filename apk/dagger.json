@@ -1,4 +1,7 @@
 {
   "name": "apk",
-  "sdk": "go"
+  "sdk": "go",
+  "dependencies": [
+    "github.com/jpadams/daggerverse/trivy@21f9211e5727a0b6acce8a0ab6c35d01896dc642"
+  ]
 }
