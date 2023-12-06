@@ -52,6 +52,7 @@ func (m *Apk) Build(
 	debugPkgs Optional[bool],
 	wolfi Optional[bool],
 ) (*Container, error) {
+	// TODO: what should this repo interface look like?
 	m.Wolfi = wolfi.GetOr(false)
 	repo := goapk.NewRepositoryFromComponents(
 		alpineRepository,
@@ -87,6 +88,7 @@ func (m *Apk) Build(
 	if err != nil {
 		return nil, fmt.Errorf("failed to get alpine packages: %w", err)
 	}
+	// TODO: i dont think we need to error here
 	//if len(conflicts) > 0 {
 	//	return nil, fmt.Errorf("failed to get alpine packages with conflicts: %v", conflicts)
 	//}
@@ -147,6 +149,7 @@ func (m *Apk) Build(
 		if triggerFile != nil {
 			ctr = ctr.
 				WithMountedFile("/tmp/script", triggerFile).
+				// TODO: triggers failing for git package on wolfi
 //				WithExec([]string{"/tmp/script"}).
 				WithoutMount("/tmp/script")
 		}
