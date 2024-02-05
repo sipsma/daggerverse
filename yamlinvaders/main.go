@@ -21,5 +21,5 @@ func (m *Yamlinvaders) Play(ctx context.Context) *Container {
 		WithWorkdir("/src").
 		WithExec([]string{"git", "apply", "/dagger.patch"}).
 		WithExec([]string{"make"}).
-		WithDefaultShell([]string{"./ascii_invaders"})
+		WithDefaultTerminalCmd([]string{"./ascii_invaders"})
 }
