@@ -9,5 +9,4 @@ Uses Chainguard's go-apk library to resolve a list of alpine packages into a DAG
 - Rough draft but works
 - Need to
   - turn into a real, customizable interface (just hard codes a lot of stuff)
-  - support more repos such as wolfi
   - get "lazy remote rebasing" working fully
