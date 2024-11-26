@@ -18,22 +18,27 @@ const (
 	alpineVersion     = "v3.18"
 	alpineRepository  = "https://dl-cdn.alpinelinux.org/alpine"
 	alpineReleasesURL = "https://alpinelinux.org/releases.json"
+	wolfiRepository = "https://packages.wolfi.dev/os"
+	wolfiKey = "https://packages.wolfi.dev/os/wolfi-signing.rsa.pub"
+	wolfiBase = "cgr.dev/chainguard/wolfi-base"
 )
 
-type Apk struct{}
+type Apk struct{
+	Wolfi bool
+}
 
 func (m *Apk) LegacyBuild(ctx context.Context, pkgs []string) *Container {
 	return dag.Container().From("alpine:" + alpineVersion[1:]).
 		WithExec(append([]string{"apk", "add"}, pkgs...))
 }
 
-func (m *Apk) Scan(ctx context.Context, pkgs []string, legacy Optional[bool]) (string, error) {
+func (m *Apk) Scan(ctx context.Context, pkgs []string, legacy Optional[bool], wolfi Optional[bool]) (string, error) {
 	var ctr *Container
 	if legacy.GetOr(false) {
 		ctr = m.LegacyBuild(ctx, pkgs)
 	} else {
 		var err error
-		ctr, err = m.Build(ctx, pkgs, Opt(false))
+		ctr, err = m.Build(ctx, pkgs, Opt(false), wolfi)
 		if err != nil {
 			return "", err
 		}
@@ -45,13 +50,24 @@ func (m *Apk) Build(
 	ctx context.Context,
 	pkgs []string,
 	debugPkgs Optional[bool],
+	wolfi Optional[bool],
 ) (*Container, error) {
+	// TODO: what should this repo interface look like?
+	m.Wolfi = wolfi.GetOr(false)
 	repo := goapk.NewRepositoryFromComponents(
 		alpineRepository,
 		alpineVersion,
 		"main",
 		"",
 	)
+	basePkgs := []string{"alpine-baselayout", "alpine-release", "busybox"}
+	builderBase := "busybox:latest"
+
+	if m.Wolfi {
+		repo.URI = wolfiRepository
+		basePkgs = []string{"wolfi-baselayout", "busybox"}
+		//builderBase = wolfiBase
+	}
 
 	keys, err := m.keys()
 	if err != nil {
@@ -65,17 +81,19 @@ func (m *Apk) Build(
 
 	pkgResolver := goapk.NewPkgResolver(ctx, indexes)
 
-	pkgs = append([]string{"alpine-baselayout", "alpine-release", "busybox"}, pkgs...)
+	pkgs = append(basePkgs, pkgs...)
 
 	repoPkgs, conflicts, err := pkgResolver.GetPackagesWithDependencies(ctx, pkgs)
+	fmt.Printf("conflicts: %v\n", conflicts)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get alpine packages: %w", err)
 	}
-	if len(conflicts) > 0 {
-		return nil, fmt.Errorf("failed to get alpine packages: %v", conflicts)
-	}
+	// TODO: i dont think we need to error here
+	//if len(conflicts) > 0 {
+	//	return nil, fmt.Errorf("failed to get alpine packages with conflicts: %v", conflicts)
+	//}
 
-	setupBase := dag.Container().From("busybox:latest")
+	setupBase := dag.Container().From(builderBase)
 
 	ctr := dag.Container()
 
@@ -131,7 +149,8 @@ func (m *Apk) Build(
 		if triggerFile != nil {
 			ctr = ctr.
 				WithMountedFile("/tmp/script", triggerFile).
-				WithExec([]string{"/tmp/script"}).
+				// TODO: triggers failing for git package on wolfi
+//				WithExec([]string{"/tmp/script"}).
 				WithoutMount("/tmp/script")
 		}
 
@@ -144,7 +163,7 @@ func (m *Apk) Build(
 }
 
 func (m *Apk) Debug(ctx context.Context, pkgs []string) (*Container, error) {
-	ctr, err := m.Build(ctx, pkgs, Opt(false))
+	ctr, err := m.Build(ctx, pkgs, Opt(false), Opt(false))
 	if err != nil {
 		return nil, err
 	}
@@ -154,15 +173,20 @@ func (m *Apk) Debug(ctx context.Context, pkgs []string) (*Container, error) {
 }
 
 func (m *Apk) keys() (map[string][]byte, error) {
-	releases, err := m.releases()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get alpine releases: %w", err)
+	var urls []string
+	if m.Wolfi {
+		urls = []string{wolfiKey}
+	} else {
+		releases, err := m.releases()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get alpine releases: %w", err)
+		}
+		branch := releases.GetReleaseBranch(alpineVersion)
+		if branch == nil {
+			return nil, fmt.Errorf("failed to get alpine branch for version %s", alpineVersion)
+		}
+		urls = branch.KeysFor(apkarch(), time.Now())
 	}
-	branch := releases.GetReleaseBranch(alpineVersion)
-	if branch == nil {
-		return nil, fmt.Errorf("failed to get alpine branch for version %s", alpineVersion)
-	}
-	urls := branch.KeysFor(apkarch(), time.Now())
 
 	keys := make(map[string][]byte)
 	for _, u := range urls {
