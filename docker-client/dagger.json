@@ -1,6 +1,6 @@
 {
   "name": "docker-client",
+  "engineVersion": "v0.15.1",
   "sdk": "go",
-  "source": ".",
-  "engineVersion": "dev-d131549dc9340c7658236aa1da6c1b2aff2c7253"
+  "source": "."
 }
